@@ -41,16 +41,16 @@ resource "azurerm_role_assignment" "kv_role_assignment" {
 }
 
 #################################################
-# RANDOM PASSWORD: SECURE CREDENTIAL FOR LINUX VM
+# RANDOM PASSWORD: SECURE CREDENTIAL FOR POSTGRES
 #################################################
 resource "random_password" "postgres_password" {
   length  = 24                    # Password length (strong enough for automation)
   special = false                 # No special characters (avoids compatibility issues with some scripts)
 }
 
-############################################
-# KEY VAULT SECRET: STORE PACKER CREDENTIALS
-############################################
+###############################################
+# KEY VAULT SECRET: STORE POSTGRES CREDENTIALS
+###############################################
 resource "azurerm_key_vault_secret" "postgres_secret" {
   name         = "postgres-credentials"                                                  
                                    # Secret name inside the Key Vault
