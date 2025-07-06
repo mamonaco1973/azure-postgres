@@ -83,7 +83,7 @@ resource "azurerm_key_vault_secret" "pgadmin_secret" {
   name = "pgadmin-credentials"
   # Secret name inside the Key Vault
   value = jsonencode({
-    username = "admin@local.test"
+    username = "admin@localhost.com"
     password = random_password.pgadmin_password.result
   })
   # Store a JSON-encoded object with username and generated password
