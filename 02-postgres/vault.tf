@@ -48,12 +48,6 @@ resource "random_password" "postgres_password" {
   special = false # No special characters (avoids compatibility issues with some scripts)
 }
 
-resource "random_password" "pgadmin_password" {
-  length  = 24
-  special = false
-}
-
-
 ###############################################
 # KEY VAULT SECRET: STORE POSTGRES CREDENTIALS
 ###############################################
@@ -76,23 +70,3 @@ resource "azurerm_key_vault_secret" "postgres_secret" {
 }
 
 
-###############################################
-# KEY VAULT SECRET: STORE PGADMIN CREDENTIALS
-###############################################
-resource "azurerm_key_vault_secret" "pgadmin_secret" {
-  name = "pgadmin-credentials"
-  # Secret name inside the Key Vault
-  value = jsonencode({
-    username = "admin@${var.azure_domain}"
-    password = random_password.pgadmin_password.result
-  })
-  # Store a JSON-encoded object with username and generated password
-
-  key_vault_id = azurerm_key_vault.credentials_key_vault.id
-  # Reference the ID of the Key Vault created earlier
-  depends_on = [azurerm_role_assignment.kv_role_assignment]
-  # Ensure role assignment is completed before attempting to write secrets
-
-  content_type = "application/json"
-  # Add metadata describing the format of the stored secret value
-}

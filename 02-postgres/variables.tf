@@ -33,8 +33,3 @@ variable "project_location" {
   default     = "Central US"                                                               # Change this if deploying in a different region
   type        = string
 }
-
-variable "azure_domain" {
-  description = "The default Azure AD domain"
-#  default     = "mamonaco1973gmail.onmicrosoft.com"
-}
