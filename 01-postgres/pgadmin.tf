@@ -36,16 +36,17 @@ resource "azurerm_container_app" "pgadmin" {
         value = "Password1!"
       }
     }
-
-    scale {
-      min_replicas = 1
-      max_replicas = 1
-    }
   }
-
+  
   ingress {
     external_enabled = true
     target_port      = 80
     transport        = "auto"
+
+    traffic_weight {
+      percentage      = 100
+      latest_revision = true
+    }
   }
+
 }
