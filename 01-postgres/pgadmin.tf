@@ -26,7 +26,7 @@ resource "azurerm_container_group" "pgadmin" {
     }
 
     environment_variables = {
-      PGADMIN_DEFAULT_EMAIL    = "admin@local"
+      PGADMIN_DEFAULT_EMAIL    = "admin@local.test"
       PGADMIN_DEFAULT_PASSWORD = random_password.pgadmin_password.result
     }
   }
