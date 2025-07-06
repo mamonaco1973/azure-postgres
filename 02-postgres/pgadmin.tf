@@ -26,7 +26,7 @@ resource "azurerm_container_group" "pgadmin" {
     }
 
     environment_variables = {
-      PGADMIN_DEFAULT_EMAIL    = "admin@localhost.com"
+      PGADMIN_DEFAULT_EMAIL    = "admin@${var.azure_domain}"
       PGADMIN_DEFAULT_PASSWORD = random_password.pgadmin_password.result
     }
   }
