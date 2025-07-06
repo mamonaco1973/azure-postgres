@@ -5,29 +5,24 @@ resource "random_string" "suffix" {
   special = false
 }
 
-resource "azurerm_container_group" "pgadmin" {
-  name                = "pgadmin"
+resource "azurerm_container_group" "pgweb" {
+  name                = "pgweb"
   location            = azurerm_resource_group.project_rg.location
   resource_group_name = azurerm_resource_group.project_rg.name
   os_type             = "Linux"
 
   ip_address_type = "Public"
-  dns_name_label  = "pgadmin-${random_string.suffix.result}"
+  dns_name_label  = "pgweb-${random_string.suffix.result}"
 
   container {
-    name   = "pgadmin"
-    image  = "dpage/pgadmin4:latest"
-    cpu    = "1"
-    memory = "1.5"
+    name   = "pgweb"
+    image  = "sosedoff/pgweb:latest"
+    cpu    = "1.0"
+    memory = "1.0"
 
     ports {
-      port     = 80
+      port     = 8081
       protocol = "TCP"
-    }
-
-    environment_variables = {
-      PGADMIN_DEFAULT_EMAIL    = "admin@${var.azure_domain}"
-      PGADMIN_DEFAULT_PASSWORD = random_password.pgadmin_password.result
     }
   }
 }
