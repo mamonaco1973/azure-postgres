@@ -6,20 +6,20 @@
 # CREATE A VIRTUAL NETWORK (VNET) TO CONTAIN BOTH APPLICATION AND BASTION SUBNETS
 # -------------------------------------------------------------------------------------------------
 resource "azurerm_virtual_network" "project-vnet" {
-  name                = var.project_vnet                               # VNet name (passed as variable)
-  address_space       = ["10.0.0.0/23"]                                 # Total address range for all subnets (512 IPs)
-  location            = var.project_location                            # Azure region for VNet
-  resource_group_name = azurerm_resource_group.project_rg.name          # Target resource group
+  name                = var.project_vnet                       # VNet name (passed as variable)
+  address_space       = ["10.0.0.0/23"]                        # Total address range for all subnets (512 IPs)
+  location            = var.project_location                   # Azure region for VNet
+  resource_group_name = azurerm_resource_group.project_rg.name # Target resource group
 }
 
 # -------------------------------------------------------------------------------------------------
 # DEFINE A SUBNET FOR POSTGRESQL DATABASES
 # -------------------------------------------------------------------------------------------------
 resource "azurerm_subnet" "postgres-subnet" {
-  name                 = var.project_subnet                             # Subnet name (variable input)
-  resource_group_name  = azurerm_resource_group.project_rg.name         # Must match the VNet’s RG
-  virtual_network_name = azurerm_virtual_network.project-vnet.name      # Attach to parent VNet
-  address_prefixes     = ["10.0.0.0/25"]                                 # Lower half of VNet CIDR (128 IPs)
+  name                 = var.project_subnet                        # Subnet name (variable input)
+  resource_group_name  = azurerm_resource_group.project_rg.name    # Must match the VNet’s RG
+  virtual_network_name = azurerm_virtual_network.project-vnet.name # Attach to parent VNet
+  address_prefixes     = ["10.0.0.0/25"]                           # Lower half of VNet CIDR (128 IPs)
 
   delegation {
     name = "delegation"
@@ -45,7 +45,7 @@ resource "azurerm_network_security_group" "postgres-nsg" {
   # -------- Allow SSH access --------
   security_rule {
     name                       = "Allow-Posgres"
-    priority                   = 1000                                    # Lower = higher priority
+    priority                   = 1000 # Lower = higher priority
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
