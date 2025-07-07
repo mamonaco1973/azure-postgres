@@ -51,3 +51,25 @@ resource "azurerm_key_vault_secret" "postgres_secret" {
   depends_on   = [azurerm_role_assignment.kv_role_assignment] # Ensure access is granted before creating secret
   content_type = "application/json"                           # Tag content format for metadata clarity
 }
+
+# =================================================================================
+# CREATE A STRONG RANDOM PASSWORD FOR VM LOGIN
+# =================================================================================
+resource "random_password" "vm_password" {
+  length  = 24    # 24 characters for strong entropy
+  special = false # Avoid special chars (e.g., for scripts or connection strings)
+}
+
+# =================================================================================
+# SAVE VM CREDENTIALS AS A JSON-ENCODED SECRET IN KEY VAULT
+# =================================================================================
+resource "azurerm_key_vault_secret" "vm_secret" {
+  name = "vm-credentials" # Logical name of the secret
+  value = jsonencode({    # JSON-encoded username + password
+    username = "sysadmin"
+    password = random_password.vm_password.result
+  })
+  key_vault_id = azurerm_key_vault.credentials_key_vault.id   # Target Key Vault ID
+  depends_on   = [azurerm_role_assignment.kv_role_assignment] # Ensure access is granted before creating secret
+  content_type = "application/json"                           # Tag content format for metadata clarity
+}
