@@ -65,6 +65,7 @@ resource "azurerm_public_ip" "pgweb_vm_public_ip" {
   name                = "pgweb-vm-public-ip"
   location            = var.project_location
   resource_group_name = azurerm_resource_group.project_rg.name
-  allocation_method   = "Dynamic"
-  domain_name_label   = "pgwebvm${random_string.suffix.result}"
+  allocation_method   = "Static"                     
+  sku                 = "Standard"                     
+  domain_name_label   = "pgweb-${random_string.suffix.result}"
 }
