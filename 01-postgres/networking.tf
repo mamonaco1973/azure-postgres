@@ -61,7 +61,7 @@ resource "azurerm_subnet_network_security_group_association" "postgres-nsg-assoc
 # DEFINE SUBNET FOR VIRTUAL MACHINES / APPLICATION WORKLOADS
 # =================================================================================
 resource "azurerm_subnet" "vm-subnet" {
-  name                 = var.project_subnet                        # Subnet name (from variable)
+  name                 = "vm-subnet"                               # Subnet name (from variable)
   resource_group_name  = azurerm_resource_group.project_rg.name    # RG must match VNet's
   virtual_network_name = azurerm_virtual_network.project-vnet.name # Link to parent VNet
   address_prefixes     = ["10.0.1.0/25"]                           # 128 IPs (upper half of /23)
