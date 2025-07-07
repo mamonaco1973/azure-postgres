@@ -23,13 +23,10 @@ data "azurerm_client_config" "current" {}
 # Essential for role assignments, policy bindings, and managed identity linkage
 
 #############################################
-# RESOURCE GROUP DEFINITION
+# RESOURCE GROUP LOOKUP
 #############################################
 
-# Create the primary resource group that will contain all infrastructure
-resource "azurerm_resource_group" "project_rg" {
-  name = var.project_resource_group # Logical container for Azure resources
-  # Name must be globally unique within the subscription
-  location = var.project_location # Region where resources will be deployed
-  # Pick the region closest to your users or workloads
+# Look up an existing resource group by name
+data "azurerm_resource_group" "project_rg" {
+  name = var.project_resource_group
 }

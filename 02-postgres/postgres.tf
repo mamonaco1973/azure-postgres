@@ -3,8 +3,8 @@
 # -------------------------------------------------
 resource "azurerm_postgresql_flexible_server" "public" {
   name                          = "public-postgres-instance"
-  resource_group_name           = azurerm_resource_group.project_rg.name
-  location                      = azurerm_resource_group.project_rg.location
+  resource_group_name           = data.azurerm_resource_group.project_rg.name
+  location                      = data.azurerm_resource_group.project_rg.location
   version                       = "15"
   administrator_login           = "postgres"
   administrator_password        = random_password.postgres_password.result

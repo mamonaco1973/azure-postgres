@@ -9,7 +9,7 @@ resource "azurerm_virtual_network" "project-vnet" {
   name                = var.project_vnet                       # VNet name (passed as variable)
   address_space       = ["10.0.0.0/23"]                        # Total address range for all subnets (512 IPs)
   location            = var.project_location                   # Azure region for VNet
-  resource_group_name = azurerm_resource_group.project_rg.name # Target resource group
+  resource_group_name = data.azurerm_resource_group.project_rg.name # Target resource group
 }
 
 # -------------------------------------------------------------------------------------------------
@@ -17,7 +17,7 @@ resource "azurerm_virtual_network" "project-vnet" {
 # -------------------------------------------------------------------------------------------------
 resource "azurerm_subnet" "postgres-subnet" {
   name                 = var.project_subnet                        # Subnet name (variable input)
-  resource_group_name  = azurerm_resource_group.project_rg.name    # Must match the VNet’s RG
+  resource_group_name  = data.azurerm_resource_group.project_rg.name    # Must match the VNet’s RG
   virtual_network_name = azurerm_virtual_network.project-vnet.name # Attach to parent VNet
   address_prefixes     = ["10.0.0.0/25"]                           # Lower half of VNet CIDR (128 IPs)
 
@@ -40,7 +40,7 @@ resource "azurerm_subnet" "postgres-subnet" {
 resource "azurerm_network_security_group" "postgres-nsg" {
   name                = "postgres-nsg"
   location            = var.project_location
-  resource_group_name = azurerm_resource_group.project_rg.name
+  resource_group_name = data.azurerm_resource_group.project_rg.name
 
   # -------- Allow SSH access --------
   security_rule {

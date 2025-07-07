@@ -7,8 +7,8 @@ resource "random_string" "suffix" {
 
 resource "azurerm_container_group" "pgweb" {
   name                = "pgweb"
-  location            = azurerm_resource_group.project_rg.location
-  resource_group_name = azurerm_resource_group.project_rg.name
+  location            = data.azurerm_resource_group.project_rg.location
+  resource_group_name = data.azurerm_resource_group.project_rg.name
   os_type             = "Linux"
 
   ip_address_type = "Public"
