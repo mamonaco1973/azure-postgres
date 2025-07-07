@@ -1,72 +1,53 @@
-############################################
-# RANDOM STRING: UNIQUE KEY VAULT SUFFIX
-############################################
+# =================================================================================
+# GENERATE RANDOM SUFFIX FOR UNIQUE KEY VAULT NAME
+# =================================================================================
 resource "random_string" "key_vault_suffix" {
-  length  = 8     # Generate an 8-character string
-  special = false # Exclude special characters (for DNS-safe naming)
-  upper   = false # Use only lowercase alphanumeric characters
-  # Final result will be appended to Key Vault name for uniqueness
+  length  = 8     # Create an 8-character string for uniqueness
+  special = false # Exclude special characters to ensure DNS-compliant names
+  upper   = false # Lowercase only (safe for Azure naming conventions)
+  # Final output will be appended to the Key Vault name
 }
 
-############################################
-# AZURE KEY VAULT: CENTRALIZED SECRETS STORE
-############################################
+# =================================================================================
+# DEPLOY A CENTRALIZED AZURE KEY VAULT FOR SECRETS MANAGEMENT
+# =================================================================================
 resource "azurerm_key_vault" "credentials_key_vault" {
-  name = "creds-kv-${random_string.key_vault_suffix.result}"
-  # Dynamically generate a unique Key Vault name using the random string
-  resource_group_name = azurerm_resource_group.project_rg.name
-  # Place the Key Vault inside the existing resource group
-  location = var.project_location
-  # Deploy in the same region as the resource group
-  sku_name = "standard"
-  # Use Standard SKU (most common for general-purpose secrets management)
-  tenant_id = data.azurerm_client_config.current.tenant_id
-  # Azure AD tenant ID from the currently authenticated user context
-  purge_protection_enabled = false
-  # Disable purge protection (irreversible deletion allowed)
-  enable_rbac_authorization = true
-  # Use RBAC (role-based access control) instead of Access Policies
+  name                      = "creds-kv-${random_string.key_vault_suffix.result}" # Unique Key Vault name
+  resource_group_name       = azurerm_resource_group.project_rg.name              # Place Key Vault in target resource group
+  location                  = var.project_location                                # Use the same Azure region
+  sku_name                  = "standard"                                          # Standard SKU for general-purpose secrets
+  tenant_id                 = data.azurerm_client_config.current.tenant_id        # Azure AD tenant of the current user
+  purge_protection_enabled  = false                                               # Allow permanent deletion
+  enable_rbac_authorization = true                                                # Enable RBAC (preferred over legacy Access Policies)
 }
 
-############################################
-# RBAC ASSIGNMENT: ALLOW USER TO MANAGE SECRETS
-############################################
+# =================================================================================
+# ASSIGN "Key Vault Secrets Officer" ROLE TO CURRENT USER OR SERVICE PRINCIPAL
+# =================================================================================
 resource "azurerm_role_assignment" "kv_role_assignment" {
-  scope = azurerm_key_vault.credentials_key_vault.id
-  # Apply the role at the Key Vault resource level
-  role_definition_name = "Key Vault Secrets Officer"
-  # Grants permissions to read/write secrets (not certificates or keys)
-  principal_id = data.azurerm_client_config.current.object_id
-  # Assign role to currently authenticated user or service principal
+  scope                = azurerm_key_vault.credentials_key_vault.id   # Limit scope to the Key Vault
+  role_definition_name = "Key Vault Secrets Officer"                  # Grant permissions for managing secrets only
+  principal_id         = data.azurerm_client_config.current.object_id # Target: currently logged-in user or service principal
 }
 
-#################################################
-# RANDOM PASSWORD: SECURE CREDENTIAL FOR POSTGRES
-#################################################
+# =================================================================================
+# CREATE A STRONG RANDOM PASSWORD FOR DATABASE LOGIN
+# =================================================================================
 resource "random_password" "postgres_password" {
-  length  = 24    # Password length (strong enough for automation)
-  special = false # No special characters (avoids compatibility issues with some scripts)
+  length  = 24    # 24 characters for strong entropy
+  special = false # Avoid special chars (e.g., for scripts or connection strings)
 }
 
-###############################################
-# KEY VAULT SECRET: STORE POSTGRES CREDENTIALS
-###############################################
+# =================================================================================
+# SAVE POSTGRES CREDENTIALS AS A JSON-ENCODED SECRET IN KEY VAULT
+# =================================================================================
 resource "azurerm_key_vault_secret" "postgres_secret" {
-  name = "postgres-credentials"
-  # Secret name inside the Key Vault
-  value = jsonencode({
+  name = "postgres-credentials" # Logical name of the secret
+  value = jsonencode({          # JSON-encoded username + password
     username = "postgres"
     password = random_password.postgres_password.result
   })
-  # Store a JSON-encoded object with username and generated password
-
-  key_vault_id = azurerm_key_vault.credentials_key_vault.id
-  # Reference the ID of the Key Vault created earlier
-  depends_on = [azurerm_role_assignment.kv_role_assignment]
-  # Ensure role assignment is completed before attempting to write secrets
-
-  content_type = "application/json"
-  # Add metadata describing the format of the stored secret value
+  key_vault_id = azurerm_key_vault.credentials_key_vault.id   # Target Key Vault ID
+  depends_on   = [azurerm_role_assignment.kv_role_assignment] # Ensure access is granted before creating secret
+  content_type = "application/json"                           # Tag content format for metadata clarity
 }
-
-

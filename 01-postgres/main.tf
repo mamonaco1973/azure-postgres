@@ -1,35 +1,31 @@
-#############################################
-# AZURE PROVIDER CONFIGURATION
-#############################################
 
-# Configure the AzureRM provider (required for interacting with Azure)
+# =================================================================================
+# CONFIGURE THE AZURERM PROVIDER TO INTERACT WITH AZURE RESOURCES
+# =================================================================================
 provider "azurerm" {
-  features {} # Enables all optional AzureRM features (default empty block required)
-  # Do NOT remove this, even if it looks empty
+  features {} # Required block to enable AzureRM features; must be included even if empty
+  # Do NOT remove this block — it's mandatory for provider initialization
 }
 
-#############################################
-# DATA SOURCES FOR AZURE CONTEXT
-#############################################
-
-# Fetch metadata about the current subscription
+# =================================================================================
+# FETCH DETAILS ABOUT THE CURRENT AZURE SUBSCRIPTION
+# =================================================================================
 data "azurerm_subscription" "primary" {}
-# Provides details like subscription ID, tenant ID, and display name
-# Useful for tagging, auditing, or linking resources to subscription context
+# Returns subscription_id, display_name, and tenant_id
+# Useful for tagging, cross-subscription logic, or referencing tenant scope
 
-# Get authentication details for the current Azure CLI / Service Principal session
+# =================================================================================
+# FETCH AUTH CONTEXT FOR CURRENT AZURE CLI OR SERVICE PRINCIPAL
+# =================================================================================
 data "azurerm_client_config" "current" {}
-# Exposes object_id, client_id, and tenant_id
-# Essential for role assignments, policy bindings, and managed identity linkage
+# Returns object_id, client_id, tenant_id of the currently authenticated principal
+# Essential for assigning roles, linking managed identities, and securing resources
 
-#############################################
-# RESOURCE GROUP DEFINITION
-#############################################
-
-# Create the primary resource group that will contain all infrastructure
+# =================================================================================
+# CREATE THE PRIMARY RESOURCE GROUP FOR ALL DEPLOYED RESOURCES
+# =================================================================================
 resource "azurerm_resource_group" "project_rg" {
-  name     = var.project_resource_group       # Logical container for Azure resources
-                                              # Name must be globally unique within the subscription
-  location = var.project_location             # Region where resources will be deployed
-                                              # Pick the region closest to your users or workloads
+  name     = var.project_resource_group # Name for the resource group (from input variable)
+  location = var.project_location       # Azure region to deploy into (from input variable)
+  # This group will act as the logical container for all related infrastructure
 }
