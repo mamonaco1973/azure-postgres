@@ -13,11 +13,6 @@ fi
 # STEP 1: Provision postgres infrastructure (VNet, subnets, NICs, etc.)
 #-------------------------------------------------------------------------------
 
-cd 01-acr
-terraform init
-terraform apply -auto-approve          
-cd ..
-
 cd 02-postgres                         # Navigate to Terraform infra folder
 terraform init                         # Initialize Terraform plugins/backend
 terraform apply -auto-approve          # Apply infrastructure configuration without prompt
