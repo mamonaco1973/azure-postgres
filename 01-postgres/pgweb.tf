@@ -53,6 +53,16 @@ resource "azurerm_linux_virtual_machine" "pgweb-vm" {
     sku       = "server"           # Server edition
     version   = "latest"           # Always pull the latest available image
   }
+
+  # ------------------------------------------------------
+  # Pass custom data (cloud-init) to the VM at creation
+  # ------------------------------------------------------
+  
+  custom_data = base64encode(templatefile("./scripts/pgweb.sh.template", {
+    PGPASSWORD  =  random_password.postgres_password.result  
+    PGENDPOINT  = "public-postgres-instance.postgres.database.azure.com"                     
+  }))
+
 }
 
 resource "random_string" "suffix" {
