@@ -63,6 +63,8 @@ resource "azurerm_linux_virtual_machine" "pgweb-vm" {
     PGENDPOINT = "public-postgres-instance.postgres.database.azure.com"
   }))
 
+  depends_on = [azurerm_postgresql_flexible_server.postgres_instance]
+
 }
 
 resource "random_string" "suffix" {
