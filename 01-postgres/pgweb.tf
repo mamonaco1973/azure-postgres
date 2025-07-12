@@ -60,7 +60,7 @@ resource "azurerm_linux_virtual_machine" "pgweb-vm" {
 
   custom_data = base64encode(templatefile("./scripts/pgweb.sh.template", {
     PGPASSWORD = random_password.postgres_password.result
-    PGENDPOINT = "public-postgres-instance.postgres.database.azure.com"
+    PGENDPOINT = "postgres-instance-${random_string.suffix.result}.postgres.database.azure.com"
   }))
 
   depends_on = [azurerm_postgresql_flexible_server.postgres_instance]
