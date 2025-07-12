@@ -46,7 +46,7 @@ resource "azurerm_private_dns_zone_virtual_network_link" "postgres_dns_link" {
 # CREATE PRIVATE POSTGRESQL FLEXIBLE SERVER
 # =================================================================================
 resource "azurerm_postgresql_flexible_server" "postgres_instance" {
-  name                          = "postgres-instance"
+  name                          = "postgres-instance-${random_string.suffix.result}"
   resource_group_name           = azurerm_resource_group.project_rg.name
   location                      = azurerm_resource_group.project_rg.location
   version                       = "15"
