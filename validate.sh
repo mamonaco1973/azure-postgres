@@ -17,7 +17,7 @@ PG_DNS=$(az postgres flexible-server list \
   --query "[?starts_with(name, 'postgres-instance')].fullyQualifiedDomainName" \
   --output tsv)
 
-echo "NOTE: Hostname for postgres server is $PG_DNS"
+echo "NOTE: Hostname for postgres server is \"$PG_DNS\""
 
 #-------------------------------------------------------------------------------
 # END OF SCRIPT
