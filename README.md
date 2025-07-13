@@ -1,6 +1,6 @@
 # Deploying PostgreSQL on Azure
 
-This project demonstrates how to deploy a secure, private PostgreSQL Flexible Server on Microsoft Azure using Terraform. Unlike public-facing databases, this setup ensures that all traffic to the PostgreSQL instance remains within a private virtual network, enhancing security and compliance for sensitive workloads.
+This project demonstrates how to deploy a secure, private PostgreSQL Flexible Server on Microsoft Azure using Terraform.
 
 The deployment includes a fully managed Azure PostgreSQL Flexible Server with public access disabled, integrated into a custom virtual network and secured with a Private DNS Zone for internal name resolution. Additionally, the project provisions a lightweight Ubuntu virtual machine that runs [pgweb](https://github.com/sosedoff/pgweb), a browser-based PostgreSQL client, allowing private, browser-accessible interaction with the database.
 
