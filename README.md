@@ -17,7 +17,7 @@ As part of the configuration, we deploy the [Pagila](https://www.postgresql.org/
 
 ## Overview of Azure Database for PostgreSQL – Flexible Server
 
-Azure offers two deployment options for managed PostgreSQL databases: **Flexible Server** and **Single Server**. While Single Server is being phased out, Flexible Server provides enhanced control, performance, and configuration options, making it the recommended choice for new deployments.
+Historically, Azure offered two deployment options for managed PostgreSQL databases: **Flexible Server** and **Single Server**.  Single Server is being phased out as of March 2025. Flexible Server provides enhanced control, performance, and configuration options, making it really the ideal for new deployments.
 
 This project uses **Flexible Server** with private networking, allowing complete isolation of your database within an Azure Virtual Network. This ensures secure, internal-only access to your PostgreSQL instance—ideal for enterprise workloads, compliance requirements, and production-grade applications.
 
