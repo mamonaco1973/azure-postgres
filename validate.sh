@@ -54,7 +54,7 @@ echo "NOTE: Waiting for pgweb to become available:"
 echo "NOTE:   ${PGWEB_URL}"
 
 attempt=1
-until curl -sS --head --fail "${PGWEB_URL}" >/dev/null 2>&1; do
+until curl -sS "${PGWEB_URL}" >/dev/null 2>&1; do
   if [ "${attempt}" -ge "${MAX_ATTEMPTS}" ]; then
     echo "ERROR: pgweb did not become available after ${MAX_ATTEMPTS} attempts."
     echo "ERROR: Last checked URL: ${PGWEB_URL}"
