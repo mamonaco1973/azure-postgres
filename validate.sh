@@ -51,7 +51,6 @@ PGWEB_URL="http://${PGWEB_FQDN}${PGWEB_PATH}"
 # WAIT FOR PGWEB TO BECOME REACHABLE
 # ===============================================================================
 echo "NOTE: Waiting for pgweb to become available:"
-echo "NOTE:   ${PGWEB_URL}"
 
 attempt=1
 until curl -sS "${PGWEB_URL}" >/dev/null 2>&1; do
