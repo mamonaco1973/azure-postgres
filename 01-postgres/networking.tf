@@ -1,84 +1,121 @@
 # =================================================================================
-# CREATE A VIRTUAL NETWORK (VNET) TO HOST ALL SUBNETS
+# CREATE VIRTUAL NETWORK
 # =================================================================================
-resource "azurerm_virtual_network" "project-vnet" {
-  name                = var.project_vnet                       # VNet name (from input variable)
-  address_space       = ["10.0.0.0/23"]                        # VNet CIDR range (512 IPs total)
-  location            = var.project_location                   # Azure region (from variable)
-  resource_group_name = azurerm_resource_group.project_rg.name # Resource group for the VNet
+# Purpose:
+#   - Provide a private network boundary for all project subnets.
+#
+# Notes:
+#   - The VNet CIDR is intentionally small (/23) for lab/demo footprints.
+#   - Subnets below carve the /23 into two /25 ranges.
+# =================================================================================
+resource "azurerm_virtual_network" "project_vnet" {
+  name                = var.project_vnet
+  address_space       = ["10.0.0.0/23"]
+  location            = var.project_location
+  resource_group_name = azurerm_resource_group.project_rg.name
 }
 
 # =================================================================================
-# DEFINE SUBNET FOR POSTGRESQL FLEXIBLE SERVER
+# CREATE SUBNET FOR POSTGRESQL FLEXIBLE SERVER
 # =================================================================================
-resource "azurerm_subnet" "postgres-subnet" {
-  name                 = var.project_subnet                        # Subnet name (from variable)
-  resource_group_name  = azurerm_resource_group.project_rg.name    # Must match VNet's RG
-  virtual_network_name = azurerm_virtual_network.project-vnet.name # Link to parent VNet
-  address_prefixes     = ["10.0.0.0/25"]                           # 128 IPs (lower half of /23)
+# Purpose:
+#   - Host Azure Database for PostgreSQL Flexible Server with delegated subnet.
+#
+# Notes:
+#   - PostgreSQL Flexible Server requires subnet delegation to the service.
+#   - The /25 provides 128 IPs for service consumption and future growth.
+# =================================================================================
+resource "azurerm_subnet" "postgres_subnet" {
+  name                 = var.project_subnet
+  resource_group_name  = azurerm_resource_group.project_rg.name
+  virtual_network_name = azurerm_virtual_network.project_vnet.name
+  address_prefixes     = ["10.0.0.0/25"]
 
-  # Delegation required for PostgreSQL Flexible Server
   delegation {
-    name = "delegation"
+    name = "postgres-flexible-delegation"
+
     service_delegation {
-      name    = "Microsoft.DBforPostgreSQL/flexibleServers"               # Required service
-      actions = ["Microsoft.Network/virtualNetworks/subnets/join/action"] # Allow VNet actions
+      name = "Microsoft.DBforPostgreSQL/flexibleServers"
+
+      actions = [
+        "Microsoft.Network/virtualNetworks/subnets/join/action",
+      ]
     }
   }
 }
 
 # =================================================================================
-# CREATE NETWORK SECURITY GROUP (NSG) FOR POSTGRESQL SUBNET
+# CREATE NSG FOR POSTGRESQL SUBNET
 # =================================================================================
-resource "azurerm_network_security_group" "postgres-nsg" {
-  name                = "postgres-nsg"                         # NSG name
-  location            = var.project_location                   # Region (from variable)
-  resource_group_name = azurerm_resource_group.project_rg.name # Target RG
+# Purpose:
+#   - Control traffic at the subnet boundary for PostgreSQL workloads.
+#
+# Notes:
+#   - This rule allows inbound TCP/5432. Tighten source ranges for production.
+# =================================================================================
+resource "azurerm_network_security_group" "postgres_nsg" {
+  name                = "postgres-nsg"
+  location            = var.project_location
+  resource_group_name = azurerm_resource_group.project_rg.name
 
-  # Allow inbound PostgreSQL traffic (default port 5432)
   security_rule {
     name                       = "Allow-Postgres"
-    priority                   = 1000      # Rule priority (lower = higher)
-    direction                  = "Inbound" # Incoming traffic
-    access                     = "Allow"   # Allow traffic
-    protocol                   = "Tcp"     # TCP protocol
-    source_port_range          = "*"       # All source ports
-    destination_port_range     = "5432"    # PostgreSQL port
-    source_address_prefix      = "*"       # All IPs
-    destination_address_prefix = "*"       # All IPs
+    priority                   = 1000
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "5432"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
   }
 }
 
 # =================================================================================
-# ASSOCIATE POSTGRESQL SUBNET WITH ITS NSG
+# ASSOCIATE POSTGRESQL SUBNET WITH NSG
 # =================================================================================
-resource "azurerm_subnet_network_security_group_association" "postgres-nsg-assoc" {
-  subnet_id                 = azurerm_subnet.postgres-subnet.id              # Subnet reference
-  network_security_group_id = azurerm_network_security_group.postgres-nsg.id # NSG reference
+# Purpose:
+#   - Enforce PostgreSQL subnet security rules by attaching the NSG.
+# =================================================================================
+resource "azurerm_subnet_network_security_group_association" "postgres_nsg_assoc" {
+  subnet_id                 = azurerm_subnet.postgres_subnet.id
+  network_security_group_id = azurerm_network_security_group.postgres_nsg.id
 }
 
 # =================================================================================
-# DEFINE SUBNET FOR VIRTUAL MACHINES / APPLICATION WORKLOADS
+# CREATE SUBNET FOR VMS / APPLICATION WORKLOADS
 # =================================================================================
-resource "azurerm_subnet" "vm-subnet" {
-  name                 = "vm-subnet"                               # Subnet name (from variable)
-  resource_group_name  = azurerm_resource_group.project_rg.name    # RG must match VNet's
-  virtual_network_name = azurerm_virtual_network.project-vnet.name # Link to parent VNet
-  address_prefixes     = ["10.0.1.0/25"]                           # 128 IPs (upper half of /23)
+# Purpose:
+#   - Host utility/application VMs (e.g., pgweb, jumpbox, test clients).
+#
+# Notes:
+#   - This /25 is the second half of the /23 VNet range.
+# =================================================================================
+resource "azurerm_subnet" "vm_subnet" {
+  name                 = "vm-subnet"
+  resource_group_name  = azurerm_resource_group.project_rg.name
+  virtual_network_name = azurerm_virtual_network.project_vnet.name
+  address_prefixes     = ["10.0.1.0/25"]
 }
 
 # =================================================================================
-# CREATE NETWORK SECURITY GROUP (NSG) FOR VM SUBNET
+# CREATE NSG FOR VM SUBNET
 # =================================================================================
-resource "azurerm_network_security_group" "vm-nsg" {
-  name                = "vm-nsg"                               # NSG name
-  location            = var.project_location                   # Region (from variable)
-  resource_group_name = azurerm_resource_group.project_rg.name # Target RG
+# Purpose:
+#   - Allow basic admin and web access to VM-based tooling.
+#
+# Notes:
+#   - HTTP (80) is typically used for web clients (pgweb/admin tools).
+#   - SSH (22) is for administration; restrict source ranges for production.
+# =================================================================================
+resource "azurerm_network_security_group" "vm_nsg" {
+  name                = "vm-nsg"
+  location            = var.project_location
+  resource_group_name = azurerm_resource_group.project_rg.name
 
-  # Allow inbound HTTP traffic on port 80
   security_rule {
     name                       = "Allow-HTTP"
-    priority                   = 1000 # Rule priority
+    priority                   = 1000
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -88,10 +125,9 @@ resource "azurerm_network_security_group" "vm-nsg" {
     destination_address_prefix = "*"
   }
 
-  # Allow inbound SSH traffic on port 22
   security_rule {
     name                       = "Allow-SSH"
-    priority                   = 1001 # Lower priority than HTTP
+    priority                   = 1001
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
@@ -103,9 +139,12 @@ resource "azurerm_network_security_group" "vm-nsg" {
 }
 
 # =================================================================================
-# ASSOCIATE VM SUBNET WITH ITS NSG
+# ASSOCIATE VM SUBNET WITH NSG
 # =================================================================================
-resource "azurerm_subnet_network_security_group_association" "vm-nsg-assoc" {
-  subnet_id                 = azurerm_subnet.vm-subnet.id              # Subnet reference
-  network_security_group_id = azurerm_network_security_group.vm-nsg.id # NSG reference
+# Purpose:
+#   - Enforce VM subnet security rules by attaching the NSG.
+# =================================================================================
+resource "azurerm_subnet_network_security_group_association" "vm_nsg_assoc" {
+  subnet_id                 = azurerm_subnet.vm_subnet.id
+  network_security_group_id = azurerm_network_security_group.vm_nsg.id
 }

@@ -1,64 +1,98 @@
 #!/bin/bash
+# =================================================================================
+# FILE: check_env.sh
+# =================================================================================
+# Purpose:
+#   - Validate that all required CLI tools are installed and available in PATH.
+#   - Verify required Azure Service Principal environment variables are set.
+#   - Authenticate to Azure using a Service Principal.
+#
+# Behavior:
+#   - The script exits immediately on any validation or authentication failure.
+# =================================================================================
 
-echo "NOTE: Validating that required commands are found in your PATH."
+# -----------------------------------------------------------------------------
+# Enable strict shell behavior
+#   -e  Exit immediately if a command exits with a non-zero status
+#   -u  Treat unset variables as an error
+#   -o pipefail  Fail if any command in a pipeline fails
+# -----------------------------------------------------------------------------
+set -euo pipefail
 
-# List of required commands
-commands=("az" "terraform" "jq")
+# =================================================================================
+# VALIDATE REQUIRED COMMANDS
+# =================================================================================
+# Purpose:
+#   - Ensure all required CLI tools are available before running Terraform.
+# =================================================================================
+echo "NOTE: Validating that required commands are found in PATH."
 
-# Flag to track if all commands are found
-all_found=true
+commands=(
+  az
+  terraform
+  jq
+)
 
-# Iterate through each command and check if it's available
 for cmd in "${commands[@]}"; do
-  if ! command -v "$cmd" &> /dev/null; then
-    echo "ERROR: $cmd is not found in the current PATH."
-    all_found=false
-  else
-    echo "NOTE: $cmd is found in the current PATH."
+  if ! command -v "${cmd}" >/dev/null 2>&1; then
+    echo "ERROR: Required command '${cmd}' not found in PATH."
+    exit 1
   fi
+  echo "NOTE: '${cmd}' is available."
 done
 
-# Final status
-if [ "$all_found" = true ]; then
-  echo "NOTE: All required commands are available."
-else
-  echo "ERROR: One or more commands are missing."
-  exit 1
-fi
+echo "NOTE: All required commands are available."
 
-echo "NOTE: Validating that required environment variables are set."
-# Array of required environment variables
-required_vars=("ARM_CLIENT_ID" "ARM_CLIENT_SECRET" "ARM_SUBSCRIPTION_ID" "ARM_TENANT_ID")
+# =================================================================================
+# VALIDATE REQUIRED ENVIRONMENT VARIABLES
+# =================================================================================
+# Purpose:
+#   - Confirm Azure Service Principal credentials are present.
+#
+# Notes:
+#   - These variables are required for non-interactive Terraform authentication
+#     with the AzureRM provider.
+# =================================================================================
+echo "NOTE: Validating required environment variables."
 
-# Flag to check if all variables are set
-all_set=true
+required_vars=(
+  ARM_CLIENT_ID
+  ARM_CLIENT_SECRET
+  ARM_SUBSCRIPTION_ID
+  ARM_TENANT_ID
+)
 
-# Loop through the required variables and check if they are set
 for var in "${required_vars[@]}"; do
-  if [ -z "${!var}" ]; then
-    echo "ERROR: $var is not set or is empty."
-    all_set=false
-  else
-    echo "NOTE: $var is set."
+  if [ -z "${!var:-}" ]; then
+    echo "ERROR: Environment variable '${var}' is not set or is empty."
+    exit 1
   fi
+  echo "NOTE: '${var}' is set."
 done
 
-# Final status
-if [ "$all_set" = true ]; then
-  echo "NOTE: All required environment variables are set."
-else
-  echo "ERROR: One or more required environment variables are missing or empty."
-  exit 1
-fi
+echo "NOTE: All required environment variables are set."
 
-echo "NOTE: Logging in to Azure using Service Principal..."
-az login --service-principal --username "$ARM_CLIENT_ID" --password "$ARM_CLIENT_SECRET" --tenant "$ARM_TENANT_ID" > /dev/null 2>&1
+# =================================================================================
+# AUTHENTICATE TO AZURE USING SERVICE PRINCIPAL
+# =================================================================================
+# Purpose:
+#   - Verify credentials by performing a non-interactive Azure login.
+#
+# Notes:
+#   - Output is suppressed to avoid leaking sensitive information.
+#   - A failure here indicates invalid credentials or tenant configuration.
+# =================================================================================
+echo "NOTE: Authenticating to Azure using Service Principal."
 
-# Check the return code of the login command
-if [ $? -ne 0 ]; then
-  echo "ERROR: Failed to log into Azure. Please check your credentials and environment variables."
-  exit 1
-else
-  echo "NOTE: Successfully logged into Azure."
-fi
+az login \
+  --service-principal \
+  --username "${ARM_CLIENT_ID}" \
+  --password "${ARM_CLIENT_SECRET}" \
+  --tenant "${ARM_TENANT_ID}" \
+  >/dev/null 2>&1
 
+echo "NOTE: Azure authentication successful."
+
+# =================================================================================
+# END OF FILE
+# =================================================================================

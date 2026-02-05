@@ -1,30 +1,70 @@
 #!/bin/bash
+# =================================================================================
+# FILE: apply.sh
+# =================================================================================
+# Purpose:
+#   - Validate the local environment.
+#   - Deploy PostgreSQL infrastructure using Terraform.
+#   - Run post-deployment validation checks.
+#
+# Behavior:
+#   - The script fails immediately on any error.
+#   - Unset variables and failed pipeline commands are treated as fatal.
+# =================================================================================
 
-#-------------------------------------------------------------------------------
-# STEP 0: Run environment validation script
-#-------------------------------------------------------------------------------
+# -----------------------------------------------------------------------------
+# Enable strict shell behavior
+#   -e  Exit immediately if a command exits with a non-zero status
+#   -u  Treat unset variables as an error
+#   -o pipefail  Fail if any command in a pipeline fails
+# -----------------------------------------------------------------------------
+set -euo pipefail
+
+# =================================================================================
+# STEP 0: VALIDATE LOCAL ENVIRONMENT
+# =================================================================================
+# Purpose:
+#   - Ensure all required tools, credentials, and variables are present
+#     before attempting deployment.
+#
+# Notes:
+#   - check_env.sh is expected to exit non-zero on failure.
+#   - With `set -e` enabled, any failure here will immediately abort.
+# =================================================================================
 ./check_env.sh
-if [ $? -ne 0 ]; then
-  echo "ERROR: Environment check failed. Exiting."
-  exit 1  # Hard exit if environment validation fails
-fi
 
-#-------------------------------------------------------------------------------
-# STEP 1: Provision postgres infrastructure (VNet, subnets, NICs, etc.)
-#-------------------------------------------------------------------------------
+# =================================================================================
+# STEP 1: DEPLOY POSTGRES INFRASTRUCTURE
+# =================================================================================
+# Purpose:
+#   - Provision core infrastructure including:
+#       * Virtual network and subnets
+#       * Network interfaces and security groups
+#       * PostgreSQL Flexible Server and supporting resources
+#
+# Notes:
+#   - -auto-approve disables interactive confirmation prompts.
+# =================================================================================
+cd 01-postgres
 
-cd 01-postgres                         # Navigate to Terraform infra folder
-terraform init                         # Initialize Terraform plugins/backend
-terraform apply -auto-approve          # Apply infrastructure configuration without prompt
-cd ..                                  # Return to root directory
+terraform init
+terraform apply -auto-approve
 
-#-------------------------------------------------------------------------------
-# STEP 2: Run validate script.
-#-------------------------------------------------------------------------------
+cd ..
 
+# =================================================================================
+# STEP 2: RUN POST-DEPLOYMENT VALIDATION
+# =================================================================================
+# Purpose:
+#   - Verify that deployed resources are reachable and operational.
+#   - Print endpoints and basic connectivity information.
+#
+# Notes:
+#   - Any validation failure will terminate the script immediately.
+# =================================================================================
 echo ""
 ./validate.sh
 
-#-------------------------------------------------------------------------------
-# END OF SCRIPT
-#-------------------------------------------------------------------------------
+# =================================================================================
+# END OF FILE
+# =================================================================================

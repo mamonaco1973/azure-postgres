@@ -1,41 +1,96 @@
 #!/bin/bash
+# ===============================================================================
+# FILE: validate.sh
+# ===============================================================================
+# Resolves and prints the pgweb endpoint and the PostgreSQL Flexible Server
+# endpoint. Also waits for pgweb to become reachable before returning success.
+#
+# OUTPUT (SUMMARY):
+#   - pgweb URL
+#   - PostgreSQL Flexible Server hostname
+# ===============================================================================
 
-#-------------------------------------------------------------------------------
-# Output pgweb URL and postgres DNS name
-#-------------------------------------------------------------------------------
+# Enable strict shell behavior:
+#   -e  Exit immediately on error
+#   -u  Treat unset variables as errors
+#   -o pipefail  Fail pipelines if any command fails
+set -euo pipefail
 
-PGWEB_DNS_NAME=$(az network public-ip show \
-  --name pgweb-vm-public-ip \
-  --resource-group postgres-rg \
-  --query "dnsSettings.fqdn" \
-  --output tsv)
 
-echo "NOTE: pgweb running at http://$PGWEB_DNS_NAME"
+# ===============================================================================
+# CONFIGURATION
+# ===============================================================================
+RESOURCE_GROUP_NAME="postgres-rg"
+PGWEB_PUBLIC_IP_NAME="pgweb-vm-public-ip"
+PGWEB_PATH="/"
+POSTGRES_NAME_PREFIX="postgres-instance"
 
-# Wait until the pgweb URL is reachable (HTTP 200 or similar)
-echo "NOTE: Waiting for pgweb to become available at http://$PGWEB_DNS_NAME ..."
-
-# Max attempts (optional)
 MAX_ATTEMPTS=30
-ATTEMPT=1
+SLEEP_SECONDS=30
 
-until curl -s --fail "http://$PGWEB_DNS_NAME" > /dev/null; do
-  if [ "$ATTEMPT" -ge "$MAX_ATTEMPTS" ]; then
-    echo "ERROR: pgweb did not become available after $MAX_ATTEMPTS attempts."
+
+# ===============================================================================
+# RESOLVE PGWEB PUBLIC DNS
+# ===============================================================================
+PGWEB_FQDN="$(az network public-ip show \
+  --resource-group "${RESOURCE_GROUP_NAME}" \
+  --name "${PGWEB_PUBLIC_IP_NAME}" \
+  --query "dnsSettings.fqdn" \
+  --output tsv)"
+
+if [ -z "${PGWEB_FQDN}" ] || [ "${PGWEB_FQDN}" = "None" ]; then
+  echo "ERROR: Could not resolve pgweb public FQDN."
+  echo "ERROR: Ensure Public IP '${PGWEB_PUBLIC_IP_NAME}' exists."
+  exit 1
+fi
+
+PGWEB_URL="http://${PGWEB_FQDN}${PGWEB_PATH}"
+
+
+# ===============================================================================
+# WAIT FOR PGWEB TO BECOME REACHABLE
+# ===============================================================================
+echo "NOTE: Waiting for pgweb to become available:"
+echo "NOTE:   ${PGWEB_URL}"
+
+attempt=1
+until curl -sS --head --fail "${PGWEB_URL}" >/dev/null 2>&1; do
+  if [ "${attempt}" -ge "${MAX_ATTEMPTS}" ]; then
+    echo "ERROR: pgweb did not become available after ${MAX_ATTEMPTS} attempts."
+    echo "ERROR: Last checked URL: ${PGWEB_URL}"
     exit 1
   fi
-  echo "WARNING: pgweb not yet reachable. Retrying in 30 seconds..."
-  sleep 30
-  ATTEMPT=$((ATTEMPT+1))
+
+  echo "NOTE: pgweb not reachable yet. Retry ${attempt}/${MAX_ATTEMPTS}."
+  sleep "${SLEEP_SECONDS}"
+  attempt=$((attempt + 1))
 done
 
-PG_DNS=$(az postgres flexible-server list \
-  --resource-group postgres-rg \
-  --query "[?starts_with(name, 'postgres-instance')].fullyQualifiedDomainName" \
-  --output tsv)
 
-echo "NOTE: Hostname for postgres server is \"$PG_DNS\""
+# ===============================================================================
+# RESOLVE POSTGRES FLEXIBLE SERVER ENDPOINT
+# ===============================================================================
+POSTGRES_FQDN="$(az postgres flexible-server list \
+  --resource-group "${RESOURCE_GROUP_NAME}" \
+  --query "[?starts_with(name, '${POSTGRES_NAME_PREFIX}')].fullyQualifiedDomainName" \
+  --output tsv)"
 
-#-------------------------------------------------------------------------------
-# END OF SCRIPT
-#-------------------------------------------------------------------------------
+if [ -z "${POSTGRES_FQDN}" ] || [ "${POSTGRES_FQDN}" = "None" ]; then
+  echo "ERROR: Could not resolve PostgreSQL Flexible Server endpoint."
+  echo "ERROR: No server found with prefix '${POSTGRES_NAME_PREFIX}'."
+  exit 1
+fi
+
+
+# ===============================================================================
+# OUTPUT SUMMARY
+# ===============================================================================
+echo "==============================================================================="
+echo "BUILD VALIDATION RESULTS"
+echo "==============================================================================="
+echo "pgweb URL:"
+echo "  ${PGWEB_URL}"
+echo
+echo "PostgreSQL Flexible Server Endpoint:"
+echo "  ${POSTGRES_FQDN}"
+echo "==============================================================================="

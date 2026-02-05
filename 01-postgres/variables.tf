@@ -1,35 +1,63 @@
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE NAME OF THE AZURE RESOURCE GROUP
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# PROJECT RESOURCE GROUP NAME
+# =================================================================================
+# Purpose:
+#   - Define the name of the Azure Resource Group.
+#   - Acts as the top-level container for all deployed resources.
+#
+# Notes:
+#   - Override via tfvars or CLI to reuse this configuration across environments.
+# =================================================================================
 variable "project_resource_group" {
-  description = "Name of the Azure Resource Group" # This is the container for all resources
-  default     = "postgres-rg"                      # Default RG name unless overridden
-  type        = string                             # Must be a string (no lists, no objects)
+  description = "Name of the Azure Resource Group"
+  type        = string
+  default     = "postgres-rg"
 }
 
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE NAME OF THE VIRTUAL NETWORK (VNET)
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# PROJECT VIRTUAL NETWORK NAME
+# =================================================================================
+# Purpose:
+#   - Define the name of the Azure Virtual Network (VNet).
+#   - Provides the private network boundary for the project.
+#
+# Notes:
+#   - Changing this value does not affect CIDR ranges defined elsewhere.
+# =================================================================================
 variable "project_vnet" {
-  description = "Name of the Azure Virtual Network" # The logical network space for your project
-  default     = "postgres-vnet"                     # Default name — can be overridden via CLI/TFVars
+  description = "Name of the Azure Virtual Network"
   type        = string
+  default     = "postgres-vnet"
 }
 
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE NAME OF THE SUBNET INSIDE THE VNET
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# PROJECT SUBNET NAME
+# =================================================================================
+# Purpose:
+#   - Define the name of the primary subnet inside the VNet.
+#   - Used for PostgreSQL Flexible Server delegation and VM workloads.
+#
+# Notes:
+#   - Keep database and utility workloads in separate subnets if expanding.
+# =================================================================================
 variable "project_subnet" {
-  description = "Name of the Azure Subnet within the Virtual Network" # Subdivision of the VNet where VMs live
-  default     = "postgres-subnet"                                     # Keep separate from Bastion subnet
+  description = "Name of the Azure Subnet within the Virtual Network"
   type        = string
+  default     = "postgres-subnet"
 }
 
-# -------------------------------------------------------------------------------------------------
-# DEFINE THE AZURE REGION FOR RESOURCE DEPLOYMENT
-# -------------------------------------------------------------------------------------------------
+# =================================================================================
+# PROJECT DEPLOYMENT REGION
+# =================================================================================
+# Purpose:
+#   - Define the Azure region where all resources are deployed.
+#
+# Notes:
+#   - The region must support PostgreSQL Flexible Server.
+#   - Use consistent regions across all resources to avoid cross-region issues.
+# =================================================================================
 variable "project_location" {
-  description = "Azure region where resources will be deployed (e.g., eastus, westeurope)" # Must match available Azure regions
-  default     = "Central US"                                                               # Change this if deploying in a different region
+  description = "Azure region where resources will be deployed"
   type        = string
+  default     = "Central US"
 }
