@@ -1,162 +1,152 @@
-# Deploying PostgreSQL on Azure
+# PostgreSQL on Azure: Azure Database for PostgreSQL Flexible Server with pgweb
 
-This project demonstrates how to deploy a secure, private PostgreSQL Flexible Server on Microsoft Azure using Terraform.
+A private **Azure Database for PostgreSQL Flexible Server**, built with
+Terraform and loaded with the
+[Pagila](https://www.postgresql.org/ftp/projects/pgFoundry/dbsamples/pagila/)
+sample database. The server has no public endpoint; a **pgweb** VM with a
+public IP gives you a browser client for it.
 
-The deployment includes a fully managed Azure PostgreSQL Flexible Server with public access disabled, integrated into a custom virtual network and secured with a Private DNS Zone for internal name resolution. Additionally, the project provisions a lightweight Ubuntu virtual machine that runs [pgweb](https://github.com/sosedoff/pgweb), a browser-based PostgreSQL client, allowing private, browser-accessible interaction with the database.
+![pgweb](pgweb.png)
 
-As part of the configuration, we deploy the [Pagila](https://www.postgresql.org/ftp/projects/pgFoundry/dbsamples/pagila/) sample dataset—a fictional DVD rental database—to showcase real-world querying and administration in a private cloud context. The solution is ideal for developers and teams looking to build secure, internal-facing applications without exposing the database to the public internet.
+| Piece | Where | Role |
+|---|---|---|
+| **PostgreSQL Flexible Server** | `postgres-subnet` (delegated) | `postgres-instance-<suffix>`, PostgreSQL 15, `B_Standard_B1ms`, 32 GB, 7-day backups, zone 1; VNet-integrated, public access disabled |
+| **Private DNS zone** | linked to `postgres-vnet` | `privatelink.postgres.database.azure.com`, so the server's name resolves to its private IP |
+| **pgweb-vm** | `vm-subnet`, public IP | Ubuntu 24.04, `Standard_B1s`; loads Pagila, then serves pgweb 0.11.12 on port 80 |
+| **Key Vault** | `postgres-rg` | `creds-kv-<suffix>`: `postgres-credentials` (database admin) and `vm-credentials` (VM login) |
 
-![diagram](azure-postgres.png)
+## Architecture
 
-## What You'll Learn
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="architecture-dark.svg">
+  <img alt="A browser reaches pgweb-vm, an Ubuntu 24.04 VM with a public IP, over HTTP. At boot the VM clones this repository for the Pagila scripts and downloads pgweb from GitHub, loads Pagila into the PostgreSQL Flexible Server and serves pgweb, which connects to the server on port 5432 over TLS. The server has no public endpoint: it sits in a delegated subnet and its name resolves through a private DNS zone linked to the VNet. The passwords are in Key Vault." src="architecture-light.svg">
+</picture>
 
-- How to deploy a fully private PostgreSQL Flexible Server on Azure using Terraform
-- How to configure a custom virtual network, subnet, and Private DNS Zone for secure, internal connectivity
-- How to provision a VM running `pgweb` for private browser-based database access
-- Best practices for securing Azure-managed databases with private endpoints and infrastructure-as-code
+Regenerate with `python3 make_diagram.py`.
 
-## Overview of Azure Database for PostgreSQL – Flexible Server
+- **`01-postgres/`** is the whole stack: the resource group (`postgres-rg`),
+  the VNet (`postgres-vnet`, 10.0.0.0/23) with the delegated
+  `postgres-subnet` (10.0.0.0/25) and `vm-subnet` (10.0.1.0/25), the NSGs,
+  the private DNS zone, the Flexible Server, the Key Vault and passwords, and
+  the pgweb VM.
+- **`01-postgres/data/`** holds the Pagila load scripts (`pagila-db.sql`,
+  `pagila-schema.sql`, `pagila-data.sql`) and the sample queries.
 
-Historically, Azure offered two deployment options for managed PostgreSQL databases: **Flexible Server** and **Single Server**.  Single Server is being phased out as of March 2025. Flexible Server provides enhanced control, performance, and configuration options, making it really the ideal for new deployments.
+## How it boots
 
-This project uses **Flexible Server** with private networking, allowing complete isolation of your database within an Azure Virtual Network. This ensures secure, internal-only access to your PostgreSQL instance—ideal for enterprise workloads, compliance requirements, and production-grade applications.
+1. Terraform builds the network, the Key Vault, the Flexible Server and the
+   VM, generating 24-character passwords for the `postgres` database admin
+   and the `sysadmin` VM login.
+2. The VM installs the PostgreSQL client, clones this repository, and loads
+   Pagila with `psql`. Output is in `/tmp/db_load.log`.
+3. It downloads pgweb 0.11.12 from GitHub and runs it as a systemd service on
+   port 80. pgweb starts without a connection; you enter one when you open it.
 
-### Comparison: Flexible Server vs Single Server
+## Network security
 
-| **Aspect**                     | **Flexible Server**                                                                                 | **Single Server (Legacy)**                                                              |
-|-------------------------------|------------------------------------------------------------------------------------------------------|-----------------------------------------------------------------------------------------|
-| **Networking**                | Supports private endpoints and full VNet integration                                                | Public access with limited VNet support                                                |
-| **Availability Zones**        | Supports zone redundancy for high availability                                                      | Limited to single-AZ deployments                                                       |
-| **Maintenance Control**       | Fine-grained control over patching and maintenance windows                                          | Limited user control                                                                   |
-| **Scaling & Bursting**        | Supports compute burstable SKUs and custom backup retention policies                                | Limited scaling options                                                                |
-| **Stop/Start Capabilities**   | Manual stop/start for dev/test cost savings                                                         | Not supported                                                                          |
-| **High Availability**         | Built-in HA with same-zone or zone-redundant standby                                                 | Asynchronous geo-redundant replica (manual promotion required)                         |
-| **Recommended For**           | Production workloads needing performance, flexibility, and security                                | Legacy workloads; not recommended for new deployments                                  |
+```
+internet ─80, 22─▶ pgweb-vm ─5432─▶ PostgreSQL Flexible Server (delegated subnet)
+```
 
-### Notes on Azure vs AWS
+| NSG | Subnet | Allows |
+|---|---|---|
+| `vm-nsg` | `vm-subnet` | 80 and 22 from anywhere |
+| `postgres-nsg` | `postgres-subnet` | 5432 from anywhere |
 
-While AWS Aurora offers a distributed architecture with advanced features like Global Database and Serverless scaling, Azure Flexible Server provides a more traditional PostgreSQL setup focused on **network-level security, deployment control, and cost predictability**. Azure does not currently offer a direct equivalent to Aurora's distributed compute and storage layers, but Flexible Server fills the role of a secure, scalable managed PostgreSQL option within the Azure ecosystem.
-
-## Choosing the Right Azure Option
-
-- **Use Flexible Server** if you need private networking, zone redundancy, and better control over maintenance, scaling, and security.
-- [**Avoid Single Server**](https://techcommunity.microsoft.com/blog/adforpostgresql/retiring-azure-database-for-postgresql-single-server-in-2025/3783783) for new projects, as it is being deprecated and lacks key enterprise features. 
+The server is VNet-integrated with public access disabled, so `postgres-nsg`
+only matters inside the VNet.
 
 ## Prerequisites
 
 * [An Azure Account](https://portal.azure.com/)
-* [Install AZ CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli) 
-* [Install Latest Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install AZ CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli)
+* [Install Terraform](https://developer.hashicorp.com/terraform/install)
+* [Install jq](https://jqlang.github.io/jq/download/)
 
-If this is your first time watching our content, we recommend starting with this video: [Azure + Terraform: Easy Setup](https://youtu.be/j4aRjgH5H8Q). It provides a step-by-step guide to properly configure Terraform, and the AZ CLI.
+`check_env.sh` expects a service principal in `ARM_CLIENT_ID`,
+`ARM_CLIENT_SECRET`, `ARM_SUBSCRIPTION_ID` and `ARM_TENANT_ID`. If this is
+your first time watching our content, we recommend starting with this video:
+[Azure + Terraform: Easy Setup](https://youtu.be/j4aRjgH5H8Q).
 
-## Download this Repository
+## Deploy
 
 ```bash
 git clone https://github.com/mamonaco1973/azure-postgres.git
 cd azure-postgres
+./apply.sh       # one phase: VNet, Key Vault, Flexible Server, pgweb VM
 ```
 
-## Build the Code
+Everything deploys to Central US. `apply.sh` ends by running `validate.sh`,
+which waits for pgweb to answer (up to 15 minutes) and prints:
 
-Run [check_env](check_env.sh) then run [apply](apply.sh).
+```
+===============================================================================
+BUILD VALIDATION RESULTS
+===============================================================================
+pgweb URL:
+  http://pgweb-a1b2.centralus.cloudapp.azure.com/
+
+PostgreSQL Flexible Server Endpoint:
+  postgres-instance-a1b2.postgres.database.azure.com
+===============================================================================
+```
+
+## Try it
+
+1. Get the database password from Key Vault:
+
+   ```bash
+   vault=$(az keyvault list -g postgres-rg --query "[0].name" -o tsv)
+   az keyvault secret show --vault-name "$vault" --name postgres-credentials \
+     --query value -o tsv | jq -r .password
+   ```
+
+2. Open the pgweb URL and connect with the server endpoint from
+   `validate.sh`, user `postgres`, that password, database `pagila`, and SSL
+   mode `require`.
+3. Run the sample queries from the **Query** tab (`01-postgres/data/`):
+
+   ```sql
+   SELECT
+       f.title AS film_title,
+       a.first_name || ' ' || a.last_name AS actor_name
+   FROM film f
+   JOIN film_actor fa ON f.film_id = fa.film_id
+   JOIN actor a ON fa.actor_id = a.actor_id
+   ORDER BY f.title, actor_name
+   LIMIT 20;
+   ```
+
+   ```sql
+   SELECT
+       f.title,
+       STRING_AGG(a.first_name || ' ' || a.last_name, ', ') AS actor_names
+   FROM film f
+   JOIN film_actor fa ON f.film_id = fa.film_id
+   JOIN actor a ON fa.actor_id = a.actor_id
+   GROUP BY f.title
+   ORDER BY f.title
+   LIMIT 10;
+   ```
+
+## Troubleshooting
+
+| Symptom | Fix |
+|---|---|
+| `validate.sh` keeps retrying | The VM is still installing. SSH in as `sysadmin` (password in `vm-credentials`) and `sudo tail /var/log/cloud-init-output.log`. |
+| `pagila` is missing | Read `/tmp/db_load.log` on the VM for the `psql` output. |
+| pgweb can't connect | Set SSL mode to `require`, and use the password from `postgres-credentials`, not `vm-credentials`. |
+| You want a local client | The server is private. Connect from the VM (`psql "host=<endpoint> user=postgres dbname=pagila sslmode=require"`). |
+
+## Teardown
 
 ```bash
-Destroy complete! Resources: 22 destroyed.
-~/azure-postgres$ ./apply.sh
-NOTE: Validating that required commands are found in your PATH.
-NOTE: az is found in the current PATH.
-NOTE: terraform is found in the current PATH.
-NOTE: jq is found in the current PATH.
-NOTE: All required commands are available.
-NOTE: Validating that required environment variables are set.
-NOTE: ARM_CLIENT_ID is set.
-NOTE: ARM_CLIENT_SECRET is set.
-NOTE: ARM_SUBSCRIPTION_ID is set.
-NOTE: ARM_TENANT_ID is set.
-NOTE: All required environment variables are set.
-NOTE: Logging in to Azure using Service Principal...
-NOTE: Successfully logged into Azure.
-Initializing the backend...
-Initializing provider plugins...
-- Reusing previous version of hashicorp/azurerm from the dependency lock file
-- Reusing previous version of hashicorp/random from the dependency lock file
-- Using previously-installed hashicorp/azurerm v4.35.0
-- Using previously-installed hashicorp/random v3.7.2
-
-Terraform has been successfully initialized!
-```
-## Build Results
-
-After applying the Terraform scripts, the following Azure resources will be created:
-
-### Virtual Network & Subnet
-- Virtual Network: `project-vnet`
-  - Address space: `10.0.0.0/23`
-- Subnet for PostgreSQL Flexible Server: `postgres-subnet`
-  - Address range: `10.0.0.0/25`
-- Network Security Group: `postgres-nsg`
-  - Allows inbound PostgreSQL traffic on port 5432 from the pgweb VM
-
-### Private DNS & Networking
-- Private DNS Zone: `privatelink.postgres.database.azure.com`
-  - Enables internal name resolution for the private PostgreSQL server
-- Private Endpoint:
-  - Linked to the PostgreSQL Flexible Server
-  - Associated with the custom subnet and DNS zone
-
-### Azure Key Vault
-- Key Vault: `postgres-kv`
-  - Stores credentials securely
-  - Access granted via Key Vault policy
-
-### PostgreSQL Flexible Server
-- Server Name: Defined in variables
-- Configuration:
-  - Private access only (public network access disabled)
-  - Admin credentials retrieved from Azure Key Vault
-  - Preloaded with the [Pagila sample database](https://www.postgresql.org/ftp/projects/pgFoundry/dbsamples/pagila/)
-
-### Virtual Machine (pgweb)
-- VM Name: `pgweb-vm`
-  - Ubuntu-based VM to host `pgweb` client
-  - Deployed in the same virtual network
-  - Connected privately to the PostgreSQL server
-  - Configured to launch `pgweb` and expose a browser-based PostgreSQL UI
-
-## pgweb Demo
-
-[pgweb](https://github.com/sosedoff/pgweb/blob/main/README.md) is a simple web-based and cross platform PostgreSQL database explorer.
-
-![pgweb](pgweb.png)
-
-Query 1:
-```sql
--- Select the film title and full actor name for each film
-SELECT
-    f.title AS film_title,                                      -- Get the film's title from the 'film' table
-    a.first_name || ' ' || a.last_name AS actor_name            -- Concatenate actor's first and last name as 'actor_name'
-FROM
-    film f                                                      -- From the 'film' table aliased as 'f'
-JOIN film_actor fa ON f.film_id = fa.film_id                    -- Join with 'film_actor' to link films to their actors
-JOIN actor a ON fa.actor_id = a.actor_id                        -- Join with 'actor' table to get actor details
-ORDER BY f.title, actor_name                                    -- Order the results alphabetically by film title, then actor name
-LIMIT 20;                                                       -- Return only the first 20 results
+./destroy.sh     # destroys the whole stack, including the Key Vault
 ```
 
-Query 2:
+## Notes
 
-```sql
--- Select film titles and a comma-separated list of all actors in each film
-SELECT
-    f.title,                                                              -- Get the film's title from the 'film' table
-    STRING_AGG(a.first_name || ' ' || a.last_name, ', ') AS actor_names  -- Combine all actor full names into one comma-separated string
-FROM
-    film f                                                                -- From the 'film' table aliased as 'f'
-JOIN film_actor fa ON f.film_id = fa.film_id                              -- Join with 'film_actor' to link each film to its actors
-JOIN actor a ON fa.actor_id = a.actor_id                                  -- Join with 'actor' table to get actor names
-GROUP BY f.title                                                           -- Group results by film title so each row is one film
-ORDER BY f.title                                                           -- Sort the results alphabetically by film title
-LIMIT 20;                                                                  -- Return only the first 10 films
-```
-
+- **Lab only.** pgweb is open to the internet over plain HTTP with no
+  sign-in of its own and runs as root, SSH accepts password logins from
+  anywhere, and the database password is in the VM's custom data. Restrict
+  `vm-nsg` and add TLS for anything more.
